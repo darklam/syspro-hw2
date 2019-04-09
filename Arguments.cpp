@@ -45,7 +45,7 @@ Arguments::Arguments() {
     this->inputDir = "/Users/johnlamis/Desktop/ergasia/input";
     this->commonDir = "/Users/johnlamis/Desktop/ergasia/common";
     this->logFile = "/Users/johnlamis/Desktop/ergasia/logs";
-    this->bufferSize = 200;
+    this->bufferSize = 100000;
     this->id = 42069;
 }
 

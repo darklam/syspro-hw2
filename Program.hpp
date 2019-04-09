@@ -11,7 +11,7 @@
 class Program {
 
 private:
-    int* processedIds;
+    List<int>* ids;
     int processedLength;
 
 public:
@@ -24,6 +24,7 @@ public:
 
     void processReaderHandler(int id);
     void processWriterHandler(int id);
+    void handleRemovedId(int id);
 
     bool handleFileWrites(List<FileDto*>* files);
 };

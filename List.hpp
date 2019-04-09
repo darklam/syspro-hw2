@@ -90,6 +90,30 @@ public:
         }
     }
 
+    int findIndex(T value) {
+        ListNode<T>* current = this->root;
+        int index = -1;
+        int currentIndex = 0;
+        while (current != NULL) {
+            if (current->getValue() == value) {
+                index = currentIndex;
+                break;
+            } else {
+                currentIndex++;
+                current = current->getNext();
+            }
+        }
+        return index;
+    }
+
+    void concat(List<T>* list) {
+        ListNode<T>* current = list->root;
+
+        while (current != NULL) {
+            this->push(current->getValue());
+        }
+    }
+
     unsigned int getSize() {
         return this->size;
     }

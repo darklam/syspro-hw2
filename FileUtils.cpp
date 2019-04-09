@@ -11,6 +11,7 @@
 #include <fstream>
 #include <dirent.h>
 #include <string.h>
+#include <sstream>
 
 bool FileUtils::dirExists(char *dirname) {
     struct stat sb;
@@ -83,6 +84,8 @@ int* FileUtils::getNewIds(int* currentIds, int length) {
     while ((entry = readdir(directory)) != NULL) {
         char* name = entry->d_name;
         char* idString = strtok(name, ".");
+        char* extension = strtok(NULL, ".");
+        if (strcmp(extension, "fifo") == 0) continue;
         if (idString == NULL) continue;
         int id = atoi(idString);
         if (id == 0) continue;
@@ -108,60 +111,95 @@ List<FileDto*>* FileUtils::readPipeFiles(char* pipename) {
     if (!this->fileExists(filepath)) return out;
 
     std::fstream file;
-    file.open(filepath);
-
-    while (file.good()) {
-        int filenameLength;
-        int fileLength;
-
-        file >> filenameLength;
-        if (filenameLength == 0) break;
-        char* filename = new char[filenameLength + 1];
-        file >> filename;
-
-        file >> fileLength;
-        char* fileBytes = new char[fileLength + 1];
-        file >> fileBytes;
-
-        FileDto* fileDto = new FileDto;
-        fileDto->filename = filename;
-        fileDto->fileBytes = fileBytes;
-        fileDto->fileLength = fileLength;
-        fileDto->nameLength = filenameLength;
-
-        out->push(fileDto);
-    }
-
+    file.open(filepath, std::fstream::in | std::fstream::binary);
+    file.seekg(0, std::fstream::end);
+    int length = file.tellg();
+    file.seekg(0, std::fstream::beg);
+    char* bytes = new char[length];
+    file.read(bytes, length);
     file.close();
-
+    int index = 0;
+    while (index < length) {
+        char nameBytes[] = { bytes[index], bytes[index + 1] };
+        index += 2;
+        std::cout << nameBytes << std::endl;
+        std::stringstream ss;
+        ss << std::hex << nameBytes;
+        int nameLength;
+        ss >> nameLength;
+        if (nameLength == 0) break;
+        char* name = new char[nameLength];
+        for (int i = 0; i < nameLength; i++) {
+            name[i] = bytes[index++];
+        }
+        char fileLengthBytes[] = { bytes[index], bytes[index + 1], bytes[index + 2], bytes[index + 3] };
+        index += 4;
+        std::stringstream ss1;
+        ss1 << std::hex << fileLengthBytes;
+        int fileLength;
+        ss1 >> fileLength;
+        char* fileBytes = new char[fileLength];
+        for (int i = 0; i < fileLength; i++) {
+            fileBytes[i] = bytes[index++];
+        }
+        FileDto* current = new FileDto;
+        current->nameLength = nameLength;
+        current->filename = name;
+        current->fileLength = fileLength;
+        current->fileBytes = fileBytes;
+        out->push(current);
+    }
     return out;
 }
 
+List<int>* FileUtils::getIds() {
+    char* dir = Arguments::getInstance()->getCommonDir();
+    struct dirent* entry;
+    DIR* directory = opendir(dir);
+
+    List<int>* ids = new List<int>;
+
+    if (directory == NULL) return NULL;
+
+    while ((entry = readdir(directory)) != NULL) {
+        char* name = entry->d_name;
+        if (strcmp(name, ".") == 0) continue;
+        if (strcmp(name, "..") == 0) continue;
+        char* idString = strtok(name, ".");
+        char* extension = strtok(NULL, ".");
+        if (extension == NULL) continue;
+        if (idString == NULL) continue;
+        if (strcmp(extension, "fifo") == 0) continue;
+        int id = atoi(idString);
+        if (id == Arguments::getInstance()->getId()) continue;
+        if (id == 0) continue;
+
+        ids->push(id);
+    }
+    closedir(directory);
+    return ids;
+}
+
 FileDto* FileUtils::getFile(char* dir) {
-    FILE* file;
-    char* bytes;
-    int byteLength;
-
-    file = fopen(dir, "rb");
-    fseek(file, 0, SEEK_END);
-    byteLength = ftell(file);
-    rewind(file);
-
-    std::cout << byteLength << std::endl;
-    bytes = new char[byteLength];
-
-    fread(bytes, byteLength, 1, file);
-    fclose(file);
-
-    char* encoded;
-    size_t encodedlen;
-    Base64 b;
-
-    encoded = b.encode(bytes, byteLength, &encodedlen);
-
     FileDto* fileDto = new FileDto;
-    fileDto->fileBytes = encoded;
-    fileDto->fileLength = encodedlen;
+
+    std::fstream file;
+    file.open(dir, std::fstream::in | std::fstream::binary);
+
+    file.seekg(0, std::fstream::end);
+    int length = file.tellg();
+    file.seekg(0, std::fstream::beg);
+
+    int bufferSize = Arguments::getInstance()->getBufferSize();
+    if (length > bufferSize) length = bufferSize;
+
+    char* bytes = new char[length];
+
+    file.read(bytes, length);
+    file.close();
+
+    fileDto->fileLength = length;
+    fileDto->fileBytes = bytes;
 
     return fileDto;
 }
@@ -170,23 +208,25 @@ void FileUtils::writePipeFiles(char* pipename, List<FileDto*>* files) {
     char filepath[100];
     char* commonDir = Arguments::getInstance()->getCommonDir();
     sprintf(filepath, "%s/%s", commonDir, pipename);
-    std::cout << filepath << std::endl;
     std::ofstream file;
 
-    file.open(filepath);
+    file.open(filepath, std::fstream::out | std::fstream::binary);
 
     int fileLength = files->getSize();
 
     for (int i = 0; i < fileLength; i++) {
         FileDto* current = files->get(i);
-
-        file << current->nameLength << "\n";
-        file << current->filename << "\n";
-        file << current->fileLength << "\n";
-        file << current->fileBytes << "\n";
+        char nameLengthBytes[2];
+        char fileLengthBytes[4];
+        sprintf(nameLengthBytes, "%x", (short) current->nameLength);
+        sprintf(fileLengthBytes, "%x", current->fileLength);
+        file.write(nameLengthBytes, 2);
+        file.write(current->filename, current->nameLength);
+        file.write(fileLengthBytes, 4);
+        file.write(current->fileBytes, current->fileLength);
     }
 
-    file << "00\n";
+    file.write((char[]){ 0, 0 }, 2);
 
     file.close();
 }
@@ -200,20 +240,47 @@ List<FileDto*>* FileUtils::readDirFiles(char* dir) {
     if ((directory = opendir(dir)) == NULL) return out;
 
     while ((ent = readdir(directory)) != NULL) {
-        if (strcmp(ent->d_name, ".") == 0) continue;
-        if (strcmp(ent->d_name, "..") == 0) continue;
+        if (ent->d_name[0] == '.') continue;
 
         char fullname[100];
         sprintf(fullname, "%s/%s", dir, ent->d_name);
-        std::cout << fullname << std::endl;
         FileDto* current = this->getFile(fullname);
         current->filename = ent->d_name;
         current->nameLength = strlen(ent->d_name);
 
         out->push(current);
     }
-    std::cout << out->getSize() << std::endl;
     return out;
+}
+
+bool FileUtils::writeFile(FileDto* file) {
+    std::fstream mFile;
+    char filename[50];
+
+    sprintf(filename, "%s/%s", Arguments::getInstance()->getMirrorDir() , file->filename);
+
+    mFile.open(filename, std::fstream::binary | std::fstream::out);
+
+    mFile.write(file->fileBytes, file->fileLength);
+
+    mFile.close();
+
+    return true;
+}
+
+bool FileUtils::writeFiles(List<FileDto*>* files) {
+
+    for (int i = 0; i < files->getSize(); i++) {
+        FileDto* file = files->get(i);
+
+        bool success = this->writeFile(file);
+
+        if (!success) {
+            std::cout << "There was an error writing the file " << file->filename << std::endl;
+            _exit(1);
+        }
+    }
+    return true;
 }
 
 FileDto::~FileDto() {

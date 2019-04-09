@@ -25,6 +25,7 @@ public:
     bool createDirectory(char* dirname);
     bool createIdFile();
     int* getNewIds(int* currentIds, int length);
+    List<int>* getIds();
     List<FileDto*>* readPipeFiles(char* pipename);
     void writePipeFiles(char* pipename, List<FileDto*>* files);
 
@@ -33,6 +34,7 @@ public:
     FileDto* getFile(char* dir);
 
     bool writeFiles(List<FileDto*>* files);
+    bool writeFile(FileDto* file);
 
 };
 

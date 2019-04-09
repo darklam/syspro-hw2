@@ -18,10 +18,12 @@ int Program::mainLoop() {
     char* inputDir = args->getInputDir();
     char* mirrorDir = args->getMirrorDir();
 
-    if (fileUtils.dirExists(mirrorDir)) {
-        std::cout << "Mirror directory already exists\n";
-        return 1;
-    }
+//    if (fileUtils.dirExists(mirrorDir)) {
+//        std::cout << "Mirror directory already exists\n";
+//        return 1;
+//    }
+
+    fileUtils.createDirectory(mirrorDir);
 
     if (!fileUtils.dirExists(inputDir)) {
         std::cout << "Input directory does not exist\n";
@@ -38,38 +40,78 @@ int Program::mainLoop() {
 }
 
 Program::Program() {
-    this->processedIds = new int[10000];
+    this->ids = new List<int>;
     this->processedLength = 0;
 }
 
 Program::~Program() {
-    delete[] this->processedIds;
+    delete this->ids;
+}
+
+void Program::handleRemovedId(int id) {
+
 }
 
 void Program::listenForInputChanges() {
     unsigned int interval = 10; // seconds to wait until the directory is checked again
     FileUtils utils;
     while (true) {
-        int* newIds = utils.getNewIds(this->processedIds, this->processedLength);
-        int index = 0;
-        int current = newIds[index++];
-        while (current != 0) {
-            if (current == Arguments::getInstance()->getId()) {
-                current = newIds[index++];
-                continue;
+        List<int>* newIds = utils.getIds();
+        List<int>* idsToRemove = new List<int>;
+        for (int i = 0; i < this->ids->getSize(); i++) {
+            int currentId = this->ids->get(i);
+
+            int index = newIds->findIndex(currentId);
+            if (index == -1) {
+                this->handleRemovedId(currentId);
+                idsToRemove->push(i);
             }
-            this->processedIds[this->processedLength++] = current;
-            this->createNewProcessPair(current);
-            current = newIds[index++];
         }
-        delete[] newIds;
-        std::cout << "Sleeping\n";
+
+        for (int i = 0; i < idsToRemove->getSize(); i++) {
+            int currentIndex = idsToRemove->get(i);
+            this->ids->remove(currentIndex);
+        }
+
+        List<int>* handledIds = new List<int>;
+
+        for (int i = 0; i < newIds->getSize(); i++) {
+            int currentId = newIds->get(i);
+
+            int index = this->ids->findIndex(currentId);
+
+            if (index == -1) {
+                this->createNewProcessPair(currentId);
+                handledIds->push(currentId);
+            }
+        }
+
+        for (int i = 0; i < handledIds->getSize(); i++) {
+            int currentId = handledIds->get(i);
+
+            this->ids->push(currentId);
+        }
+
+        delete newIds;
+        delete idsToRemove;
+
+        std::cout << "Sleeping" << std::endl;
         sleep(interval);
     }
 }
 
 bool Program::handleFileWrites(List<FileDto*>* files) {
 
+    FileUtils utils;
+
+    bool success = utils.writeFiles(files);
+
+    if (!success) {
+        std::cout << "There was an error writing files\n";
+        _exit(1);
+    }
+
+    return true;
 }
 
 void Program::processReaderHandler(int id) {
@@ -79,15 +121,22 @@ void Program::processReaderHandler(int id) {
 
     FileUtils utils;
     List<FileDto*>* files = utils.readPipeFiles(nameString);
-    std::cout << files->getSize() << std::endl;
+
+    int counter = 0;
+
+    while (files->getSize() == 0 && counter < 30) {
+        files = utils.readPipeFiles(nameString);
+        counter++;
+        sleep(1);
+    }
 
     bool status = this->handleFileWrites(files);
 
     if (files->getSize() > 0) files->clearValues();
     delete files;
 
-    if (status) exit(0);
-    else exit(1);
+    if (status) _exit(0);
+    else _exit(1);
 }
 
 void Program::processWriterHandler(int id) {
@@ -95,18 +144,16 @@ void Program::processWriterHandler(int id) {
     char nameString[50];
     sprintf(nameString, "%d_to_%d.fifo", currentId, id);
 
-    std::cout << "Writing to " << nameString << std::endl;
-
     FileUtils utils;
 
     List<FileDto*>* files = utils.readDirFiles(Arguments::getInstance()->getInputDir());
 
     utils.writePipeFiles(nameString, files);
 
-    files->clearValues();
+    if (files->getSize() > 0) files->clearValues();
     delete files;
 
-    exit(0);
+    _exit(0);
 }
 
 void Program::createNewProcessPair(int id) {
@@ -117,23 +164,22 @@ void Program::createNewProcessPair(int id) {
 
     if (process1 == 0) {
         this->processReaderHandler(id);
-        exit(0);
+        _exit(0);
     }
-
-    wait(&status1);
 
     pid_t process2 = fork();
 
     if (process2 == 0) {
         this->processWriterHandler(id);
-        exit(0);
+        _exit(0);
     }
 
+    wait(&status1);
     wait(&status2);
 
 
     if (status1 != 0 || status2 != 0) {
-//        std::cout << status1 << " " << status2 << std::endl;
+        std::cout << status1 << " " << status2 << std::endl;
         std::cout << "I should have used JavaScript\n";
     }
 }
