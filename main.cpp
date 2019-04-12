@@ -8,7 +8,6 @@ int main(int argc, char** argv) {
 
     Program p;
     int code = p.mainLoop();
-
     delete args;
     return code;
 }

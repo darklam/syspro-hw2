@@ -5,13 +5,14 @@
 #include "FileUtils.hpp"
 #include "Arguments.hpp"
 #include "List.hpp"
-#include "Base64.hpp"
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
 #include <dirent.h>
 #include <string.h>
 #include <sstream>
+#include <fcntl.h>
+#include <sys/types.h>
 
 bool FileUtils::dirExists(char *dirname) {
     struct stat sb;
@@ -107,6 +108,7 @@ List<FileDto*>* FileUtils::readPipeFiles(char* pipename) {
     char filepath[100];
     char* commonDir = Arguments::getInstance()->getCommonDir();
     sprintf(filepath, "%s/%s", commonDir, pipename);
+    int fd = open(filepath, O_RDONLY);
 
     if (!this->fileExists(filepath)) return out;
 
@@ -122,16 +124,17 @@ List<FileDto*>* FileUtils::readPipeFiles(char* pipename) {
     while (index < length) {
         char nameBytes[] = { bytes[index], bytes[index + 1] };
         index += 2;
-        std::cout << nameBytes << std::endl;
         std::stringstream ss;
         ss << std::hex << nameBytes;
         int nameLength;
         ss >> nameLength;
+        std::cout << nameLength << std::endl;
         if (nameLength == 0) break;
         char* name = new char[nameLength];
         for (int i = 0; i < nameLength; i++) {
             name[i] = bytes[index++];
         }
+        std::cout << name << std::endl;
         char fileLengthBytes[] = { bytes[index], bytes[index + 1], bytes[index + 2], bytes[index + 3] };
         index += 4;
         std::stringstream ss1;
@@ -231,9 +234,63 @@ void FileUtils::writePipeFiles(char* pipename, List<FileDto*>* files) {
     file.close();
 }
 
+void FileUtils::makeDirectories(char* baseDir, char* dirs) {
+    List<char*>* folders = new List<char*>();
+    char* strtokString = new char[strlen(dirs)];
+    strcpy(strtokString, dirs);
+    char* folder = strtok(strtokString, "/");
+    folders->push(folder);
+    while((folder = strtok(NULL, "/")) != NULL) folders->push(folder);
+    char append[400];
+    sprintf(append, "%s", baseDir);
+    for (int i = 0; i < folders->getSize() - 1; i++) {
+        char* fold = folders->get(i);
+        sprintf(append, "%s/%s", append, fold);
+        if (this->dirExists(append)) continue;
+        this->createDirectory(append);
+        sprintf(append, "%s/%s", append, fold);
+    }
+    delete folders;
+    delete[] strtokString;
+}
+
+bool FileUtils::isDirecory(char *path) {
+    struct stat s;
+    if (stat(path, &s) == 0) {
+        if (s.st_mode & S_IFDIR) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void FileUtils::readDir(char *dir, char* relativeDir, List<FileDto*>* files) {
+    DIR* directory;
+    struct dirent* ent;
+
+    if ((directory = opendir(dir)) == NULL) return;
+
+    while((ent = readdir(directory)) != NULL) {
+        if (ent->d_name[0] == '.') continue;
+
+        char fullname[100];
+        sprintf(fullname, "%s/%s", dir, ent->d_name);
+        char* relativeName = new char[100];
+        sprintf(relativeName, "%s/%s", relativeDir, ent->d_name);
+        if (this->isDirecory(fullname)) {
+            readDir(fullname, relativeName, files);
+        } else {
+            FileDto* current = this->getFile(fullname);
+            current->filename = relativeName;
+            current->nameLength = strlen(relativeName);
+            files->push(current);
+        }
+    }
+}
+
 List<FileDto*>* FileUtils::readDirFiles(char* dir) {
     DIR* directory;
-    struct dirent *ent;
+    struct dirent* ent;
 
     List<FileDto*>* out = new List<FileDto*>();
 
@@ -244,20 +301,28 @@ List<FileDto*>* FileUtils::readDirFiles(char* dir) {
 
         char fullname[100];
         sprintf(fullname, "%s/%s", dir, ent->d_name);
+        if (this->isDirecory(fullname)) {
+            readDir(fullname, ent->d_name, out);
+            continue;
+        }
         FileDto* current = this->getFile(fullname);
         current->filename = ent->d_name;
         current->nameLength = strlen(ent->d_name);
 
         out->push(current);
     }
+    for (int i = 0; i < out->getSize(); i++) {
+        std::cout << out->get(i)->filename << "  " << out->get(i)->fileLength << std::endl;
+    }
     return out;
 }
 
 bool FileUtils::writeFile(FileDto* file) {
     std::fstream mFile;
-    char filename[50];
-
-    sprintf(filename, "%s/%s", Arguments::getInstance()->getMirrorDir() , file->filename);
+    char filename[300];
+    char* mirrorDir = Arguments::getInstance()->getMirrorDir();
+    sprintf(filename, "%s/%s", mirrorDir , file->filename);
+    this->makeDirectories(mirrorDir, file->filename);
 
     mFile.open(filename, std::fstream::binary | std::fstream::out);
 

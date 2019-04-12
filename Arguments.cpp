@@ -45,8 +45,8 @@ Arguments::Arguments() {
     this->inputDir = "/Users/johnlamis/Desktop/ergasia/input";
     this->commonDir = "/Users/johnlamis/Desktop/ergasia/common";
     this->logFile = "/Users/johnlamis/Desktop/ergasia/logs";
-    this->bufferSize = 100000;
-    this->id = 42069;
+    this->bufferSize = 1000000;
+    this->id = 69;
 }
 
 char* Arguments::getCommonDir() {

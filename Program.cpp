@@ -147,7 +147,6 @@ void Program::processWriterHandler(int id) {
     FileUtils utils;
 
     List<FileDto*>* files = utils.readDirFiles(Arguments::getInstance()->getInputDir());
-
     utils.writePipeFiles(nameString, files);
 
     if (files->getSize() > 0) files->clearValues();

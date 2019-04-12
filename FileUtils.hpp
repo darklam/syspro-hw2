@@ -28,6 +28,9 @@ public:
     List<int>* getIds();
     List<FileDto*>* readPipeFiles(char* pipename);
     void writePipeFiles(char* pipename, List<FileDto*>* files);
+    bool isDirecory(char* path);
+    void readDir(char* dir, char* relativeDir, List<FileDto*>*);
+    void makeDirectories(char* baseDir, char* dirs);
 
     List<FileDto*>* readDirFiles(char* dir);
 
