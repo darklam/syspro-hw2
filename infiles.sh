@@ -42,7 +42,7 @@ do
     randomText=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w $length | head -n 1)
     filePath="$path"/"$randomText"
     let "kbCount = ($NUMBER % 128 + 1) * 1024"
-    randomBytes=$(dd if=/dev/urandom bs=$kbCount count=1)
+    randomBytes=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w $kbCount | head -n 1)
     echo $randomBytes >> $filePath
 done
 
