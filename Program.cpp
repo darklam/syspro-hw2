@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <iostream>
+#include <cstdlib>
 
 int Program::mainLoop() {
 
@@ -49,7 +50,10 @@ Program::~Program() {
 }
 
 void Program::handleRemovedId(int id) {
-
+    FileUtils f;
+    char dir[300];
+    sprintf(dir, "%s/%d", Arguments::getInstance()->getMirrorDir(), id);
+    f.removeDirectory(dir);
 }
 
 void Program::listenForInputChanges() {
@@ -100,11 +104,16 @@ void Program::listenForInputChanges() {
     }
 }
 
-bool Program::handleFileWrites(List<FileDto*>* files) {
+bool Program::handleFileWrites(List<FileDto*>* files, int id) {
 
     FileUtils utils;
 
-    bool success = utils.writeFiles(files);
+    char dirname[200];
+    sprintf(dirname, "%s/%d", Arguments::getInstance()->getMirrorDir(), id);
+
+    utils.createDirectory(dirname);
+
+    bool success = utils.writeFiles(files, id);
 
     if (!success) {
         std::cout << "There was an error writing files\n";
@@ -130,7 +139,7 @@ void Program::processReaderHandler(int id) {
         sleep(1);
     }
 
-    bool status = this->handleFileWrites(files);
+    bool status = this->handleFileWrites(files, id);
 
     if (files->getSize() > 0) files->clearValues();
     delete files;

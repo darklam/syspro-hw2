@@ -24,20 +24,20 @@ public:
     bool dirExists(char* dirname);
     bool createDirectory(char* dirname);
     bool createIdFile();
-    int* getNewIds(int* currentIds, int length);
     List<int>* getIds();
     List<FileDto*>* readPipeFiles(char* pipename);
     void writePipeFiles(char* pipename, List<FileDto*>* files);
     bool isDirecory(char* path);
-    void readDir(char* dir, char* relativeDir, List<FileDto*>*);
+    List<FileDto*>* readDir(char* dir, char* relativeDir);
     void makeDirectories(char* baseDir, char* dirs);
+    void removeDirectory(char* dir);
 
     List<FileDto*>* readDirFiles(char* dir);
 
     FileDto* getFile(char* dir);
 
-    bool writeFiles(List<FileDto*>* files);
-    bool writeFile(FileDto* file);
+    bool writeFiles(List<FileDto*>* files, int id);
+    bool writeFile(FileDto* file, int id);
 
 };
 

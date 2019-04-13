@@ -26,7 +26,7 @@ public:
     void processWriterHandler(int id);
     void handleRemovedId(int id);
 
-    bool handleFileWrites(List<FileDto*>* files);
+    bool handleFileWrites(List<FileDto*>* files, int id);
 };
 
 
