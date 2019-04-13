@@ -290,6 +290,7 @@ bool FileUtils::writeFile(FileDto* file, int id) {
     sprintf(idDir, "%s/%d", mirrorDir, id);
     sprintf(filename, "%s/%s", idDir, file->filename);
     this->makeDirectories(idDir, file->filename);
+    std::cout << "Writing to " << filename << std::endl;
 
     mFile.open(filename, std::fstream::binary | std::fstream::out);
 

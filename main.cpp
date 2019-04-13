@@ -3,12 +3,19 @@
 #include "Arguments.hpp"
 #include <signal.h>
 #include <cstdio>
-#include <cstdbool>
 
 __volatile bool STOP = false;
 
 void quitHandler(int sig) {
     std::cout << "Quitting\n";
+    pid_t proc = fork();
+
+    if (proc == 0) {
+        FileUtils f;
+        f.removeDirectory(Arguments::getInstance()->getMirrorDir());
+        _exit(0);
+    }
+
     STOP = true;
 }
 

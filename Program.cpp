@@ -9,7 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <iostream>
-#include <cstdlib>
+#include <cstdio>
 
 int Program::mainLoop() {
 
@@ -19,10 +19,10 @@ int Program::mainLoop() {
     char* inputDir = args->getInputDir();
     char* mirrorDir = args->getMirrorDir();
 
-//    if (fileUtils.dirExists(mirrorDir)) {
-//        std::cout << "Mirror directory already exists\n";
-//        return 1;
-//    }
+    if (fileUtils.dirExists(mirrorDir)) {
+        std::cout << "Mirror directory already exists\n";
+        return 1;
+    }
 
     fileUtils.createDirectory(mirrorDir);
 
@@ -32,7 +32,7 @@ int Program::mainLoop() {
     }
 
     bool good = fileUtils.createIdFile();
-//    if (!good) return 1;
+    if (!good) return 1;
 
     this->listenForInputChanges();
 
@@ -85,7 +85,7 @@ void Program::listenForInputChanges() {
             int index = this->ids->findIndex(currentId);
 
             if (index == -1) {
-                this->createNewProcessPair(currentId);
+                this->createNewProcessPair(currentId, 1);
                 handledIds->push(currentId);
             }
         }
@@ -105,9 +105,8 @@ void Program::listenForInputChanges() {
 }
 
 bool Program::handleFileWrites(List<FileDto*>* files, int id) {
-
     FileUtils utils;
-
+    std::cout << id << std::endl;
     char dirname[200];
     sprintf(dirname, "%s/%d", Arguments::getInstance()->getMirrorDir(), id);
 
@@ -145,7 +144,7 @@ void Program::processReaderHandler(int id) {
     delete files;
 
     if (status) _exit(0);
-    else _exit(1);
+    else _exit(SIGUSR1);
 }
 
 void Program::processWriterHandler(int id) {
@@ -164,7 +163,8 @@ void Program::processWriterHandler(int id) {
     _exit(0);
 }
 
-void Program::createNewProcessPair(int id) {
+void Program::createNewProcessPair(int id, int retry) {
+    if (retry > 3) return;
     pid_t process1 = fork();
 
     int status1;
@@ -188,6 +188,7 @@ void Program::createNewProcessPair(int id) {
 
     if (status1 != 0 || status2 != 0) {
         std::cout << status1 << " " << status2 << std::endl;
-        std::cout << "I should have used JavaScript\n";
+        std::cout << "An error occured, retrying\n";
+        this->createNewProcessPair(id, retry + 1);
     }
 }

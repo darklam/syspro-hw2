@@ -20,7 +20,7 @@ public:
     int mainLoop();
     void listenForInputChanges();
 
-    void createNewProcessPair(int id);
+    void createNewProcessPair(int id, int retry);
 
     void processReaderHandler(int id);
     void processWriterHandler(int id);
